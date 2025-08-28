@@ -104,7 +104,7 @@ USER QUESTION:
                 sources.append(Source(
                     filename=chunk.filename,
                     page=chunk.page,
-                    snippet=chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content
+                    snippet=""  # Remove vector chunk content from sources display
                 ))
                 seen_sources.add(source_key)
         
