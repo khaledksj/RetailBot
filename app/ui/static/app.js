@@ -565,10 +565,15 @@ class ChatbotApp {
         const sourcesList = document.getElementById('sourcesList');
         
         const sourcesHtml = sources.map(source => `
-            <div class="source-item" onclick="showSourcePreview('${source.filename}', ${source.page}, '${source.snippet}')">
-                <div class="source-filename">${source.filename}</div>
-                <div class="source-page">Page ${source.page}</div>
-                <div class="source-snippet">${source.snippet}</div>
+            <div class="source-item">
+                <div class="source-filename">
+                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                    ${source.filename}
+                </div>
+                <div class="source-page text-muted">
+                    <i class="fas fa-bookmark me-1"></i>
+                    Page ${source.page}
+                </div>
             </div>
         `).join('');
         
