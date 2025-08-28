@@ -201,7 +201,8 @@ class SupabaseVectorStore(VectorStore):
                 self.connection_string,
                 min_size=1,
                 max_size=10,
-                command_timeout=60
+                command_timeout=60,
+                statement_cache_size=0  # Disable statement caching for Supabase pgbouncer
             )
             logger.info("Supabase vector store initialized successfully")
         except Exception as e:
