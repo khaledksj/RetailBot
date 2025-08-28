@@ -564,13 +564,28 @@ class ChatbotApp {
         const sourcesPanel = document.getElementById('sourcesPanel');
         const sourcesList = document.getElementById('sourcesList');
         
-        const sourcesHtml = sources.map(source => `
-            <div class="source-item">
-                <div class="source-filename">
+        // Group sources by filename to avoid duplicates
+        const uniqueSources = [];
+        const seenSources = new Set();
+        
+        sources.forEach(source => {
+            const key = `${source.filename}-${source.page}`;
+            if (!seenSources.has(key)) {
+                uniqueSources.push({
+                    filename: source.filename,
+                    page: source.page
+                });
+                seenSources.add(key);
+            }
+        });
+        
+        const sourcesHtml = uniqueSources.map(source => `
+            <div class="source-item mb-2">
+                <div class="d-flex align-items-center">
                     <i class="fas fa-file-pdf text-danger me-2"></i>
-                    ${source.filename}
+                    <strong>${source.filename}</strong>
                 </div>
-                <div class="source-page text-muted">
+                <div class="text-muted ms-3">
                     <i class="fas fa-bookmark me-1"></i>
                     Page ${source.page}
                 </div>
