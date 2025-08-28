@@ -14,6 +14,7 @@ from app.core.settings import get_settings
 from app.core.logging import setup_logging, get_logger
 from app.core.db import get_vector_store
 from app.api import ingest, chat, health, debug
+from app.api.vector_viewer import router as vector_viewer_router
 
 # Initialize settings and logging
 settings = get_settings()
@@ -55,6 +56,7 @@ app.include_router(ingest.router, prefix="/api", tags=["ingest"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+app.include_router(vector_viewer_router, prefix="/api", tags=["vector-database"])
 
 # WebSocket endpoint for streaming chat
 @app.websocket("/ws/chat")
