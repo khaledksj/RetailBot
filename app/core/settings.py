@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4o-mini"
     
     # Vector Database Configuration
-    vector_backend: str = "memory"  # memory, pgvector, chroma
+    vector_backend: str = "memory"  # memory, supabase, pgvector, chroma
+    supabase_url: Optional[str] = os.getenv("DATABASE_URL")
     db_url: Optional[str] = None
     
     # Chunking Configuration

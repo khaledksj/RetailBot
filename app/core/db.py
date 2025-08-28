@@ -9,6 +9,8 @@ import numpy as np
 from datetime import datetime
 from uuid import uuid4
 import json
+import asyncpg
+import os
 
 from app.core.models import Chunk
 from app.core.logging import get_logger
@@ -182,6 +184,172 @@ class InMemoryVectorStore(VectorStore):
         """Check if in-memory store is healthy."""
         return True
 
+
+class SupabaseVectorStore(VectorStore):
+    """Supabase/PostgreSQL vector store with pgvector extension."""
+    
+    def __init__(self, connection_string: str):
+        self.connection_string = connection_string
+        self.pool: Optional[asyncpg.Pool] = None
+        
+    async def initialize(self) -> None:
+        """Initialize the Supabase connection pool."""
+        logger.info("Initializing Supabase vector store")
+        
+        try:
+            self.pool = await asyncpg.create_pool(
+                self.connection_string,
+                min_size=1,
+                max_size=10,
+                command_timeout=60
+            )
+            logger.info("Supabase vector store initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Supabase vector store: {str(e)}")
+            raise
+            
+    async def store_document(
+        self,
+        filename: str,
+        content_hash: str,
+        chunks: List[Chunk],
+        embeddings: List[List[float]]
+    ) -> str:
+        """Store document chunks with embeddings in Supabase."""
+        if not self.pool:
+            await self.initialize()
+            
+        logger.info(f"Storing document in Supabase", extra={
+            "document_name": filename,
+            "chunks_count": len(chunks),
+            "content_hash": content_hash[:16] + "..."
+        })
+        
+        async with self.pool.acquire() as conn:  # type: ignore
+            async with conn.transaction():
+                # Insert document
+                doc_id = await conn.fetchval(
+                    "INSERT INTO documents (filename, content_hash, chunk_count) VALUES ($1, $2, $3) RETURNING doc_id",
+                    filename, content_hash, len(chunks)
+                )
+                
+                # Prepare chunk data for batch insert
+                chunk_data = []
+                for chunk, embedding in zip(chunks, embeddings):
+                    chunk.doc_id = str(doc_id)
+                    chunk.embedding = embedding
+                    
+                    chunk_data.append((
+                        chunk.chunk_id,
+                        doc_id,
+                        chunk.filename,
+                        chunk.page,
+                        chunk.chunk_idx,
+                        chunk.content,
+                        chunk.content_tokens,
+                        embedding,
+                        chunk.created_at
+                    ))
+                
+                # Batch insert chunks
+                await conn.executemany(
+                    """INSERT INTO chunks 
+                       (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
+                    chunk_data
+                )
+                
+                logger.info(f"Document stored successfully in Supabase", extra={
+                    "doc_id": str(doc_id),
+                    "chunks_stored": len(chunk_data)
+                })
+                
+                return str(doc_id)
+    
+    async def document_exists(self, content_hash: str) -> bool:
+        """Check if document already exists by content hash."""
+        if not self.pool:
+            await self.initialize()
+            
+        async with self.pool.acquire() as conn:  # type: ignore
+            result = await conn.fetchval(
+                "SELECT document_exists_by_hash($1)",
+                content_hash
+            )
+            return result
+    
+    async def similarity_search(
+        self,
+        query_embedding: List[float],
+        top_k: int = 10
+    ) -> List[Tuple[Chunk, float]]:
+        """Search for similar chunks using pgvector cosine similarity."""
+        if not self.pool:
+            await self.initialize()
+            
+        async with self.pool.acquire() as conn:  # type: ignore
+            rows = await conn.fetch(
+                "SELECT * FROM search_similar_chunks($1, $2, $3)",
+                query_embedding, 0.0, top_k
+            )
+            
+            results = []
+            for row in rows:
+                chunk = Chunk(
+                    chunk_id=row['chunk_id'],
+                    doc_id=str(row['doc_id']),
+                    filename=row['filename'],
+                    page=row['page'],
+                    chunk_idx=row['chunk_idx'],
+                    content=row['content'],
+                    content_tokens=row['content_tokens'],
+                    embedding=query_embedding,  # We don't need to fetch the full embedding
+                    created_at=row['created_at']
+                )
+                
+                similarity_score = float(row['similarity_score'])
+                results.append((chunk, similarity_score))
+            
+            logger.info(f"Similarity search completed", extra={
+                "query_embedding_dim": len(query_embedding),
+                "results_returned": len(results),
+                "top_score": results[0][1] if results else 0
+            })
+            
+            return results
+    
+    async def get_document_count(self) -> int:
+        """Get total number of documents."""
+        if not self.pool:
+            await self.initialize()
+            
+        async with self.pool.acquire() as conn:  # type: ignore
+            result = await conn.fetchval("SELECT COUNT(*) FROM documents")
+            return int(result)
+    
+    async def get_chunk_count(self) -> int:
+        """Get total number of chunks."""
+        if not self.pool:
+            await self.initialize()
+            
+        async with self.pool.acquire() as conn:  # type: ignore
+            result = await conn.fetchval("SELECT COUNT(*) FROM chunks")
+            return int(result)
+    
+    async def health_check(self) -> bool:
+        """Check if Supabase connection is healthy."""
+        try:
+            if not self.pool:
+                await self.initialize()
+                
+            async with self.pool.acquire() as conn:  # type: ignore
+                await conn.fetchval("SELECT 1")
+                return True
+        except Exception as e:
+            logger.error(f"Supabase health check failed: {str(e)}")
+            return False
+
+
 # Vector store singleton
 _vector_store: Optional[VectorStore] = None
 
@@ -194,10 +362,15 @@ def get_vector_store() -> VectorStore:
         
         if backend == "memory":
             _vector_store = InMemoryVectorStore()
-        elif backend == "pgvector":
-            # TODO: Implement PostgreSQL + pgvector backend
-            logger.warning("pgvector backend not implemented, using memory")
-            _vector_store = InMemoryVectorStore()
+        elif backend == "supabase" or backend == "pgvector":
+            # Supabase/PostgreSQL + pgvector backend
+            supabase_url = settings.supabase_url or os.getenv("DATABASE_URL")
+            if supabase_url:
+                _vector_store = SupabaseVectorStore(supabase_url)
+                logger.info("Using Supabase vector store")
+            else:
+                logger.warning("Supabase URL not configured, using memory")
+                _vector_store = InMemoryVectorStore()
         elif backend == "chroma":
             # TODO: Implement Chroma backend
             logger.warning("chroma backend not implemented, using memory")

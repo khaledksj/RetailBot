@@ -4,10 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
+    "asyncpg>=0.30.0",
     "fastapi>=0.116.1",
     "numpy>=2.3.2",
     "openai>=1.101.0",
     "pdfminer-six>=20250506",
+    "psycopg2-binary>=2.9.10",
     "pydantic-settings>=2.10.1",
     "pypdf>=6.0.0",
     "python-multipart>=0.0.20",
