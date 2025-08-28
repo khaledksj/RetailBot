@@ -233,13 +233,18 @@ class SupabaseVectorStore(VectorStore):
                     filename, content_hash, len(chunks)
                 )
                 
-                # Prepare chunk data for batch insert
-                chunk_data = []
+                # Insert chunks with proper vector formatting
                 for chunk, embedding in zip(chunks, embeddings):
                     chunk.doc_id = str(doc_id)
                     chunk.embedding = embedding
                     
-                    chunk_data.append((
+                    # Convert embedding list to PostgreSQL vector format
+                    vector_str = '[' + ','.join(map(str, embedding)) + ']'
+                    
+                    await conn.execute(
+                        """INSERT INTO chunks 
+                           (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)""",
                         chunk.chunk_id,
                         doc_id,
                         chunk.filename,
@@ -247,22 +252,13 @@ class SupabaseVectorStore(VectorStore):
                         chunk.chunk_idx,
                         chunk.content,
                         chunk.content_tokens,
-                        embedding,
+                        vector_str,
                         chunk.created_at
-                    ))
-                
-                # Batch insert chunks with proper vector formatting
-                for chunk_item in chunk_data:
-                    await conn.execute(
-                        """INSERT INTO chunks 
-                           (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
-                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)""",
-                        *chunk_item
                     )
                 
                 logger.info(f"Document stored successfully in Supabase", extra={
                     "doc_id": str(doc_id),
-                    "chunks_stored": len(chunk_data)
+                    "chunks_stored": len(chunks)
                 })
                 
                 return str(doc_id)
