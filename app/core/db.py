@@ -251,13 +251,14 @@ class SupabaseVectorStore(VectorStore):
                         chunk.created_at
                     ))
                 
-                # Batch insert chunks
-                await conn.executemany(
-                    """INSERT INTO chunks 
-                       (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)""",
-                    chunk_data
-                )
+                # Batch insert chunks with proper vector formatting
+                for chunk_item in chunk_data:
+                    await conn.execute(
+                        """INSERT INTO chunks 
+                           (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)""",
+                        *chunk_item
+                    )
                 
                 logger.info(f"Document stored successfully in Supabase", extra={
                     "doc_id": str(doc_id),
