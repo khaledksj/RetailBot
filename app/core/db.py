@@ -286,9 +286,12 @@ class SupabaseVectorStore(VectorStore):
             await self.initialize()
             
         async with self.pool.acquire() as conn:  # type: ignore
+            # Convert query embedding to PostgreSQL vector format
+            query_vector_str = '[' + ','.join(map(str, query_embedding)) + ']'
+            
             rows = await conn.fetch(
-                "SELECT * FROM search_similar_chunks($1, $2, $3)",
-                query_embedding, 0.0, top_k
+                "SELECT * FROM search_similar_chunks($1::vector, $2, $3)",
+                query_vector_str, 0.0, top_k
             )
             
             results = []
