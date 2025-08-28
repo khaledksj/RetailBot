@@ -35,7 +35,8 @@ class EmbeddingService:
             
             response = await self.client.embeddings.create(
                 model=self.model,
-                input=texts
+                input=texts,
+                dimensions=1536  # Specify 1536 dimensions to match database schema
             )
             
             embeddings = [data.embedding for data in response.data]
