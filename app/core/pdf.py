@@ -69,18 +69,10 @@ class PDFProcessor:
                 
                 # If text extraction results in mostly dots or symbols, try alternative method
                 if text and self._is_corrupted_text(text):
-                    # Try with extraction_mode for better Arabic handling
-                    try:
-                        from pypdf._page import Transformation
-                        # Alternative extraction approach
-                        text = ""
-                        for element in page._get_contents():
-                            if hasattr(element, 'get_object') and element.get_object():
-                                obj = element.get_object()
-                                if '/Length' in obj:
-                                    text += str(obj.get_data(), 'utf-8', errors='ignore')
-                    except:
-                        pass  # Fall back to original method
+                    logger.warning(f"Detected corrupted text on page {page_num + 1}, trying alternative extraction")
+                    # Skip pypdf alternative for now - it's not working well
+                    # The pdfminer fallback should handle this better
+                    pass
                 
                 pages_text.append(text or "")
             except Exception as e:
