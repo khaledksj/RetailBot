@@ -213,7 +213,10 @@ class ChatbotApp {
     }
     
     handleFileSelection(files) {
-        this.selectedFiles = Array.from(files).filter(file => file.type === 'application/pdf');
+        this.selectedFiles = Array.from(files).filter(file => 
+            file.type === 'application/pdf' || 
+            file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        );
         
         const uploadButton = document.getElementById('uploadButton');
         uploadButton.disabled = this.selectedFiles.length === 0;
@@ -245,7 +248,7 @@ class ChatbotApp {
         } else {
             const fileList = this.selectedFiles.map(file => `
                 <div class="d-flex align-items-center mb-2">
-                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                    <i class="fas fa-file-alt text-primary me-2"></i>
                     <span class="flex-grow-1">${file.name}</span>
                     <span class="badge bg-secondary">${this.formatFileSize(file.size)}</span>
                 </div>
@@ -582,7 +585,7 @@ class ChatbotApp {
         const sourcesHtml = uniqueSources.map(source => `
             <div class="source-item mb-2">
                 <div class="d-flex align-items-center">
-                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                    <i class="fas fa-file-alt text-primary me-2"></i>
                     <strong>${source.filename}</strong>
                 </div>
                 <div class="text-muted ms-3">
