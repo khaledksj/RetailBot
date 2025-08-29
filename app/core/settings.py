@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     max_temperature: float = 0.5
     
     # File Upload Configuration
-    max_file_size_mb: int = 20
+    max_file_size_mb: int = 30
     max_total_size_mb: int = 100
     
     # Logging Configuration

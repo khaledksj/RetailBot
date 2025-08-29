@@ -63,12 +63,12 @@ async def ingest_pdfs(
             # Read file content
             content = await file.read()
             
-            # Check file size (20MB limit per file)
-            if len(content) > 20 * 1024 * 1024:
+            # Check file size (30MB limit per file)
+            if len(content) > 30 * 1024 * 1024:
                 results.append(DocumentInfo(
                     filename=filename,
                     status="failed",
-                    error="File size exceeds 20MB limit",
+                    error="File size exceeds 30MB limit",
                     pages_processed=0,
                     chunks_created=0
                 ))
