@@ -268,14 +268,11 @@ USER QUESTION:
             else:
                 logger.warning("No chunks returned from similarity search in streaming")
             
-            # Lower threshold for Arabic content - accept anything with score > 0.1 (very permissive)
-            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.1]
+            # TEMPORARILY REMOVE THRESHOLD - accept all chunks to debug
+            valid_chunks = chunks_with_scores  # Accept everything for now
             
             if not valid_chunks:
-                logger.info(f"No relevant chunks found for streaming query", extra={
-                    "total_chunks_found": len(chunks_with_scores),
-                    "max_score": max([score for _, score in chunks_with_scores]) if chunks_with_scores else 0
-                })
+                logger.warning("Absolutely no chunks found in streaming query")
                 yield {
                     "type": "final_response",
                     "answer": "I couldn't find this in the manuals.",
@@ -283,7 +280,7 @@ USER QUESTION:
                 }
                 return
             
-            chunks_with_scores = valid_chunks
+            logger.info(f"Proceeding with {len(valid_chunks)} chunks for Arabic query")
             
             # Apply MMR reranking
             reranked_chunks = self._maximal_marginal_relevance(
