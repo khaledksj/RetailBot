@@ -1,5 +1,6 @@
 """
-PDF processing utilities for the Shop Manual Chatbot RAG system.
+Document processing utilities for the Shop Manual Chatbot RAG system.
+Supports PDF and Word (.docx) documents.
 """
 
 import io
@@ -7,24 +8,33 @@ from typing import List, Optional
 import pypdf
 from pypdf import PdfReader
 from pdfminer.high_level import extract_text
+from docx import Document
 
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-class PDFProcessor:
-    """PDF processor with multiple extraction backends."""
+class DocumentProcessor:
+    """Document processor supporting PDF and Word (.docx) files with multiple extraction backends."""
     
-    async def extract_text(self, pdf_content: bytes) -> List[str]:
+    async def extract_text(self, document_content: bytes, file_type: str = "pdf") -> List[str]:
         """
-        Extract text from PDF content.
+        Extract text from document content (PDF or Word).
         
         Args:
-            pdf_content: PDF file content as bytes
+            document_content: Document file content as bytes
+            file_type: Type of document ("pdf" or "docx")
             
         Returns:
-            List of text strings, one per page
+            List of text strings, one per page (PDF) or one per paragraph (Word)
         """
+        if file_type.lower() == "docx":
+            return await self._extract_from_word(document_content)
+        else:
+            return await self._extract_from_pdf(document_content)
+    
+    async def _extract_from_pdf(self, pdf_content: bytes) -> List[str]:
+        """Extract text from PDF content."""
         logger.info(f"Extracting text from PDF", extra={
             "pdf_size_bytes": len(pdf_content)
         })
@@ -55,6 +65,66 @@ class PDFProcessor:
         
         logger.error("All PDF extraction methods failed")
         return []
+    
+    async def _extract_from_word(self, docx_content: bytes) -> List[str]:
+        """Extract text from Word (.docx) document."""
+        try:
+            logger.info(f"Extracting text from Word document", extra={
+                "docx_size_bytes": len(docx_content)
+            })
+            
+            # Load the Word document from bytes
+            doc_file = io.BytesIO(docx_content)
+            doc = Document(doc_file)
+            
+            # Extract text paragraph by paragraph
+            paragraphs = []
+            current_page_text = []
+            chars_per_page = 3000  # Approximate characters per "page" for chunking
+            current_chars = 0
+            
+            for paragraph in doc.paragraphs:
+                para_text = paragraph.text.strip()
+                if para_text:  # Skip empty paragraphs
+                    current_page_text.append(para_text)
+                    current_chars += len(para_text)
+                    
+                    # If we've accumulated enough text, create a new "page"
+                    if current_chars >= chars_per_page:
+                        paragraphs.append('\n\n'.join(current_page_text))
+                        current_page_text = []
+                        current_chars = 0
+            
+            # Add any remaining text as the final "page"
+            if current_page_text:
+                paragraphs.append('\n\n'.join(current_page_text))
+            
+            # If no paragraphs were found, try extracting from tables
+            if not paragraphs:
+                table_text = []
+                for table in doc.tables:
+                    for row in table.rows:
+                        row_text = []
+                        for cell in row.cells:
+                            cell_text = cell.text.strip()
+                            if cell_text:
+                                row_text.append(cell_text)
+                        if row_text:
+                            table_text.append(' | '.join(row_text))
+                
+                if table_text:
+                    paragraphs = ['\n'.join(table_text)]
+            
+            logger.info(f"Successfully extracted text from Word document", extra={
+                "pages_count": len(paragraphs),
+                "total_chars": sum(len(page) for page in paragraphs)
+            })
+            
+            return paragraphs if paragraphs else [""]
+            
+        except Exception as e:
+            logger.error(f"Failed to extract text from Word document: {str(e)}")
+            return []
     
     async def _extract_with_pypdf(self, pdf_content: bytes) -> List[str]:
         """Extract text using pypdf library with Arabic support."""

@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.core.logging import get_logger
 from app.core.models import IngestResponse, DocumentInfo
-from app.core.pdf import PDFProcessor
+from app.core.pdf import DocumentProcessor
 from app.core.chunker import DocumentChunker
 from app.core.llm import EmbeddingService
 from app.core.db import get_vector_store
@@ -40,15 +40,20 @@ async def ingest_pdfs(
         raise HTTPException(status_code=400, detail="No files provided")
     
     # Validate file types and sizes
+    allowed_types = {
+        "application/pdf": "pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx"
+    }
+    
     for file in files:
-        if not file.content_type == "application/pdf":
+        if file.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400, 
-                detail=f"File {file.filename} is not a PDF"
+                detail=f"File {file.filename} must be a PDF or Word document (.docx). Received: {file.content_type}"
             )
     
     vector_store = get_vector_store()
-    pdf_processor = PDFProcessor()
+    document_processor = DocumentProcessor()
     chunker = DocumentChunker()
     embedding_service = EmbeddingService()
     
@@ -88,8 +93,9 @@ async def ingest_pdfs(
                 ))
                 continue
             
-            # Extract text from PDF
-            pages_text = await pdf_processor.extract_text(content)
+            # Determine file type and extract text
+            file_type = allowed_types.get(file.content_type, "pdf")
+            pages_text = await document_processor.extract_text(content, file_type)
             
             if not pages_text:
                 results.append(DocumentInfo(
