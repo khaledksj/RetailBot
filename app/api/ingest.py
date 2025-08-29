@@ -53,7 +53,8 @@ async def ingest_pdfs(
             )
     
     vector_store = get_vector_store()
-    document_processor = DocumentProcessor()
+    from app.core.document_processor import EnhancedDocumentProcessor
+    document_processor = EnhancedDocumentProcessor()
     chunker = DocumentChunker()
     embedding_service = EmbeddingService()
     
@@ -108,7 +109,7 @@ async def ingest_pdfs(
             
             # Determine file type and extract text
             file_type = allowed_types.get(file.content_type, "pdf")
-            pages_text = await document_processor.extract_text(content, file_type)
+            pages_text = await document_processor.extract_text(content, file_type, filename)
             
             if not pages_text:
                 results.append(DocumentInfo(
