@@ -86,14 +86,17 @@ class DocumentProcessor:
             for paragraph in doc.paragraphs:
                 para_text = paragraph.text.strip()
                 if para_text:  # Skip empty paragraphs
-                    current_page_text.append(para_text)
-                    current_chars += len(para_text)
-                    
-                    # If we've accumulated enough text, create a new "page"
-                    if current_chars >= chars_per_page:
-                        paragraphs.append('\n\n'.join(current_page_text))
-                        current_page_text = []
-                        current_chars = 0
+                    # Clean and normalize the text for Arabic content
+                    para_text = self._clean_and_normalize_text(para_text)
+                    if para_text:  # Check if text remains after cleaning
+                        current_page_text.append(para_text)
+                        current_chars += len(para_text)
+                        
+                        # If we've accumulated enough text, create a new "page"
+                        if current_chars >= chars_per_page:
+                            paragraphs.append('\n\n'.join(current_page_text))
+                            current_page_text = []
+                            current_chars = 0
             
             # Add any remaining text as the final "page"
             if current_page_text:
@@ -108,7 +111,9 @@ class DocumentProcessor:
                         for cell in row.cells:
                             cell_text = cell.text.strip()
                             if cell_text:
-                                row_text.append(cell_text)
+                                cell_text = self._clean_and_normalize_text(cell_text)
+                                if cell_text:
+                                    row_text.append(cell_text)
                         if row_text:
                             table_text.append(' | '.join(row_text))
                 
