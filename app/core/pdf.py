@@ -87,7 +87,7 @@ class DocumentProcessor:
                 para_text = paragraph.text.strip()
                 if para_text:  # Skip empty paragraphs
                     # Clean and normalize the text for Arabic content
-                    para_text = self._clean_and_normalize_text(para_text)
+                    para_text = self._clean_text(para_text)
                     if para_text:  # Check if text remains after cleaning
                         current_page_text.append(para_text)
                         current_chars += len(para_text)
@@ -111,7 +111,7 @@ class DocumentProcessor:
                         for cell in row.cells:
                             cell_text = cell.text.strip()
                             if cell_text:
-                                cell_text = self._clean_and_normalize_text(cell_text)
+                                cell_text = self._clean_text(cell_text)
                                 if cell_text:
                                     row_text.append(cell_text)
                         if row_text:
