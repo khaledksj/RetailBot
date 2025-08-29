@@ -255,13 +255,32 @@ USER QUESTION:
                 top_k=settings.top_k
             )
             
-            if not chunks_with_scores:
+            # Log similarity scores for debugging (same as regular process_query)
+            if chunks_with_scores:
+                scores = [score for _, score in chunks_with_scores]
+                logger.info(f"Similarity scores", extra={
+                    "max_score": max(scores),
+                    "min_score": min(scores),
+                    "avg_score": sum(scores) / len(scores),
+                    "all_scores": scores[:3]  # Log first 3 scores
+                })
+            
+            # Lower threshold for Arabic content - accept anything with score > 0.15
+            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.15]
+            
+            if not valid_chunks:
+                logger.info(f"No relevant chunks found for streaming query", extra={
+                    "total_chunks_found": len(chunks_with_scores),
+                    "max_score": max([score for _, score in chunks_with_scores]) if chunks_with_scores else 0
+                })
                 yield {
                     "type": "final_response",
                     "answer": "I couldn't find this in the manuals.",
                     "sources": []
                 }
                 return
+            
+            chunks_with_scores = valid_chunks
             
             # Apply MMR reranking
             reranked_chunks = self._maximal_marginal_relevance(
