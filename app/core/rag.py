@@ -151,8 +151,8 @@ USER QUESTION:
                     "all_scores": scores[:3]  # Log first 3 scores
                 })
             
-            # Lower threshold for Arabic content - accept anything with score > 0.15
-            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.15]
+            # Lower threshold for Arabic content - accept anything with score > 0.1 (very permissive)
+            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.1]
             
             if not valid_chunks:
                 logger.info(f"No relevant chunks found for query", extra={
@@ -265,8 +265,8 @@ USER QUESTION:
                     "all_scores": scores[:3]  # Log first 3 scores
                 })
             
-            # Lower threshold for Arabic content - accept anything with score > 0.15
-            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.15]
+            # Lower threshold for Arabic content - accept anything with score > 0.1 (very permissive)
+            valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.1]
             
             if not valid_chunks:
                 logger.info(f"No relevant chunks found for streaming query", extra={
