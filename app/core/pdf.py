@@ -57,14 +57,31 @@ class PDFProcessor:
         return []
     
     async def _extract_with_pypdf(self, pdf_content: bytes) -> List[str]:
-        """Extract text using pypdf library."""
+        """Extract text using pypdf library with Arabic support."""
         pdf_file = io.BytesIO(pdf_content)
         reader = PdfReader(pdf_file)
         
         pages_text = []
         for page_num, page in enumerate(reader.pages):
             try:
+                # Extract text with different strategies for better Arabic support
                 text = page.extract_text()
+                
+                # If text extraction results in mostly dots or symbols, try alternative method
+                if text and self._is_corrupted_text(text):
+                    # Try with extraction_mode for better Arabic handling
+                    try:
+                        from pypdf._page import Transformation
+                        # Alternative extraction approach
+                        text = ""
+                        for element in page._get_contents():
+                            if hasattr(element, 'get_object') and element.get_object():
+                                obj = element.get_object()
+                                if '/Length' in obj:
+                                    text += str(obj.get_data(), 'utf-8', errors='ignore')
+                    except:
+                        pass  # Fall back to original method
+                
                 pages_text.append(text or "")
             except Exception as e:
                 logger.warning(f"Error extracting page {page_num + 1}: {str(e)}")
@@ -72,19 +89,63 @@ class PDFProcessor:
         
         return pages_text
     
+    def _is_corrupted_text(self, text: str) -> bool:
+        """Check if extracted text appears to be corrupted (mostly dots, symbols)."""
+        if not text:
+            return True
+        
+        # Count meaningful characters vs dots/symbols
+        meaningful_chars = sum(1 for c in text if c.isalnum())
+        dots_and_symbols = sum(1 for c in text if c in '.,;:!?-_()[]{}')
+        total_chars = len(text.replace(' ', '').replace('\n', ''))
+        
+        if total_chars == 0:
+            return True
+        
+        # If more than 60% are dots/symbols, consider it corrupted
+        corruption_ratio = dots_and_symbols / total_chars
+        return corruption_ratio > 0.6
+    
     async def _extract_with_pdfminer(self, pdf_content: bytes) -> List[str]:
-        """Extract text using pdfminer library."""
+        """Extract text using pdfminer library with better Arabic support."""
         pdf_file = io.BytesIO(pdf_content)
         
-        # Extract all text (pdfminer doesn't provide easy per-page extraction)
+        # Extract all text with better encoding handling
         try:
-            full_text = extract_text(pdf_file)
+            # Use LAParams for better Arabic text extraction
+            from pdfminer.layout import LAParams
+            from pdfminer.converter import TextConverter
+            from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+            from pdfminer.pdfpage import PDFPage
+            
+            output_string = io.StringIO()
+            laparams = LAParams(
+                char_margin=0.3,
+                line_margin=0.5,
+                word_margin=0.1,
+                boxes_flow=0.5,
+                detect_vertical=True  # Better for Arabic text
+            )
+            
+            with TextConverter(PDFResourceManager(), output_string, laparams=laparams) as device:
+                interpreter = PDFPageInterpreter(PDFResourceManager(), device)
+                for page in PDFPage.get_pages(pdf_file):
+                    interpreter.process_page(page)
+            
+            full_text = output_string.getvalue()
+            output_string.close()
+            
         except Exception as e:
-            logger.error(f"pdfminer full text extraction failed: {str(e)}")
-            return []
+            logger.warning(f"Advanced pdfminer extraction failed: {str(e)}")
+            # Fallback to simple extraction
+            try:
+                pdf_file.seek(0)  # Reset file pointer
+                full_text = extract_text(pdf_file)
+            except Exception as e2:
+                logger.error(f"pdfminer full text extraction failed: {str(e2)}")
+                return []
         
         # Simple heuristic to split by pages
-        # This is not perfect but works for many PDFs
         pages = self._split_text_by_pages(full_text)
         
         return pages
