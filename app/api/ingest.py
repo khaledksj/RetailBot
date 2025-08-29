@@ -62,7 +62,20 @@ async def ingest_pdfs(
     
     for file in files:
         try:
-            filename = file.filename or "unknown.pdf"
+            # Handle UTF-8 encoding for filenames
+            raw_filename = file.filename or "unknown.pdf"
+            try:
+                # Try to properly decode the filename if it's corrupted
+                if isinstance(raw_filename, bytes):
+                    filename = raw_filename.decode('utf-8', errors='replace')
+                else:
+                    filename = raw_filename
+                # Clean up any remaining encoding artifacts
+                filename = filename.encode('utf-8', errors='ignore').decode('utf-8')
+            except Exception as e:
+                logger.warning(f"Filename encoding issue, using fallback: {str(e)}")
+                filename = "document_" + hashlib.sha256(str(raw_filename).encode()).hexdigest()[:8]
+            
             logger.info(f"Processing file: {filename}")
             
             # Read file content
