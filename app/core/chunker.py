@@ -23,7 +23,7 @@ class DocumentChunker:
         self.overlap_tokens = settings.chunk_overlap_tokens
     
     def _normalize_text(self, text: str) -> str:
-        """Normalize whitespace and clean text."""
+        """Normalize whitespace and clean text while preserving Arabic and other languages."""
         # Normalize whitespace
         text = re.sub(r'\s+', ' ', text)
         
@@ -32,7 +32,10 @@ class DocumentChunker:
         
         # Clean up common PDF artifacts
         text = re.sub(r'[\u200b-\u200d\ufeff]', '', text)  # Zero-width chars
-        text = re.sub(r'[^\x00-\x7F]+', ' ', text)  # Non-ASCII chars (simple approach)
+        
+        # Remove only control characters and other problematic characters
+        # Keep Arabic (0600-06FF), Latin (0000-007F), and other useful Unicode ranges
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)  # Control chars only
         
         return text.strip()
     
