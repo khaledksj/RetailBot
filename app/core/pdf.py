@@ -4,11 +4,15 @@ Supports PDF and Word (.docx) documents.
 """
 
 import io
+import re
 from typing import List, Optional
 import pypdf
 from pypdf import PdfReader
 from pdfminer.high_level import extract_text
 from docx import Document
+import pdfplumber
+import arabic_reshaper
+from bidi.algorithm import get_display
 
 from app.core.logging import get_logger
 
@@ -16,6 +20,28 @@ logger = get_logger(__name__)
 
 class DocumentProcessor:
     """Document processor supporting PDF and Word (.docx) files with multiple extraction backends."""
+    
+    def _is_arabic_text(self, text: str) -> bool:
+        """Check if text contains Arabic characters."""
+        if not text:
+            return False
+        arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]')
+        arabic_chars = len(arabic_pattern.findall(text))
+        return arabic_chars > len(text) * 0.1  # If more than 10% Arabic characters
+    
+    def _process_arabic_text(self, text: str) -> str:
+        """Process Arabic text with proper reshaping and bidirectional rendering."""
+        try:
+            if self._is_arabic_text(text):
+                # Reshape Arabic text to handle ligatures and connections
+                reshaped_text = arabic_reshaper.reshape(text)
+                # Apply bidirectional algorithm for proper RTL rendering
+                bidi_text = get_display(reshaped_text)
+                return bidi_text
+            return text
+        except Exception as e:
+            logger.warning(f"Arabic text processing failed, using original: {str(e)}")
+            return text
     
     async def extract_text(self, document_content: bytes, file_type: str = "pdf") -> List[str]:
         """
@@ -39,7 +65,19 @@ class DocumentProcessor:
             "pdf_size_bytes": len(pdf_content)
         })
         
-        # Try pypdf first
+        # Try pdfplumber first (best for Arabic)
+        try:
+            pages_text = await self._extract_with_pdfplumber(pdf_content)
+            if pages_text and any(page.strip() for page in pages_text):
+                logger.info(f"Successfully extracted text with pdfplumber", extra={
+                    "pages_count": len(pages_text),
+                    "total_chars": sum(len(page) for page in pages_text)
+                })
+                return pages_text
+        except Exception as e:
+            logger.warning(f"pdfplumber extraction failed: {str(e)}")
+        
+        # Try pypdf as fallback
         try:
             pages_text = await self._extract_with_pypdf(pdf_content)
             if pages_text and any(page.strip() for page in pages_text):
@@ -66,6 +104,33 @@ class DocumentProcessor:
         logger.error("All PDF extraction methods failed")
         return []
     
+    async def _extract_with_pdfplumber(self, pdf_content: bytes) -> List[str]:
+        """Extract text using pdfplumber with Arabic RTL support."""
+        pdf_file = io.BytesIO(pdf_content)
+        pages_text = []
+        
+        try:
+            with pdfplumber.open(pdf_file) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    try:
+                        # Extract with RTL character direction for Arabic
+                        page_text = page.extract_text(char_dir_render="rtl")
+                        if page_text:
+                            # Process Arabic text if detected
+                            processed_text = self._process_arabic_text(page_text)
+                            pages_text.append(processed_text)
+                        else:
+                            pages_text.append("")
+                    except Exception as e:
+                        logger.warning(f"Failed to extract text from page {page_num + 1}: {str(e)}")
+                        pages_text.append("")
+                        
+        except Exception as e:
+            logger.error(f"pdfplumber failed to open PDF: {str(e)}")
+            raise
+            
+        return pages_text
+    
     async def _extract_from_word(self, docx_content: bytes) -> List[str]:
         """Extract text from Word (.docx) document."""
         try:
@@ -86,8 +151,10 @@ class DocumentProcessor:
             for paragraph in doc.paragraphs:
                 para_text = paragraph.text.strip()
                 if para_text:  # Skip empty paragraphs
-                    current_page_text.append(para_text)
-                    current_chars += len(para_text)
+                    # Process Arabic text if detected
+                    processed_text = self._process_arabic_text(para_text)
+                    current_page_text.append(processed_text)
+                    current_chars += len(processed_text)
                     
                     # If we've accumulated enough text, create a new "page"
                     if current_chars >= chars_per_page:
@@ -108,7 +175,8 @@ class DocumentProcessor:
                         for cell in row.cells:
                             cell_text = cell.text.strip()
                             if cell_text:
-                                row_text.append(cell_text)
+                                processed_cell_text = self._process_arabic_text(cell_text)
+                                row_text.append(processed_cell_text)
                         if row_text:
                             table_text.append(' | '.join(row_text))
                 
