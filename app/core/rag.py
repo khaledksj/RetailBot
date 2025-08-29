@@ -258,12 +258,15 @@ USER QUESTION:
             # Log similarity scores for debugging (same as regular process_query)
             if chunks_with_scores:
                 scores = [score for _, score in chunks_with_scores]
-                logger.info(f"Similarity scores", extra={
+                logger.info(f"Streaming similarity scores found", extra={
                     "max_score": max(scores),
                     "min_score": min(scores),
                     "avg_score": sum(scores) / len(scores),
-                    "all_scores": scores[:3]  # Log first 3 scores
+                    "all_scores": scores[:5],  # Log first 5 scores
+                    "total_chunks": len(chunks_with_scores)
                 })
+            else:
+                logger.warning("No chunks returned from similarity search in streaming")
             
             # Lower threshold for Arabic content - accept anything with score > 0.1 (very permissive)
             valid_chunks = [(chunk, score) for chunk, score in chunks_with_scores if score > 0.1]
