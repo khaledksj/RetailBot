@@ -131,7 +131,8 @@ async def ingest_pdfs(
                     page_chunks = chunker.chunk_text(
                         text=page_text,
                         page_number=page_num,
-                        filename=filename
+                        filename=filename,
+                        tenant_id=str(current_user.tenant_id)
                     )
                     all_chunks.extend(page_chunks)
             

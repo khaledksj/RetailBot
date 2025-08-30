@@ -5,7 +5,7 @@ Document chunking utilities for the Shop Manual Chatbot RAG system.
 import re
 import tiktoken
 from typing import List, Optional
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from app.core.settings import get_settings
 from app.core.logging import get_logger
@@ -159,7 +159,8 @@ class DocumentChunker:
         text: str,
         page_number: int,
         filename: str,
-        doc_id: Optional[str] = None
+        doc_id: Optional[str] = None,
+        tenant_id: Optional[str] = None
     ) -> List[Chunk]:
         """
         Chunk text from a document page.
@@ -200,6 +201,7 @@ class DocumentChunker:
             chunk = Chunk(
                 chunk_id=str(uuid4()),
                 doc_id=doc_id or str(uuid4()),
+                tenant_id=UUID(tenant_id) if tenant_id else UUID('00000000-0000-0000-0000-000000000000'),
                 filename=filename,
                 page=page_number,
                 chunk_idx=chunk_idx,
