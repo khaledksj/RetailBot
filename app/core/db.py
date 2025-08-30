@@ -331,7 +331,7 @@ class SupabaseVectorStore(VectorStore):
                 chunk = Chunk(
                     chunk_id=row['chunk_id'],
                     doc_id=str(row['doc_id']),
-                    tenant_id=UUID(row['tenant_id']),
+                    tenant_id=row['tenant_id'],  # Already a UUID object from database
                     filename=row['filename'],
                     page=row['page'],
                     chunk_idx=row['chunk_idx'],
