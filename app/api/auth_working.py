@@ -78,6 +78,43 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise credentials_exception
 
+async def verify_token(token: str) -> User:
+    """Verify JWT token and return user (for WebSocket authentication)."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+        
+        # Get user from database
+        auth_service = await get_auth_service()
+        async with auth_service.pool.acquire() as conn:
+            user_data = await conn.fetchrow(
+                "SELECT id, tenant_id, email, role, created_at, updated_at FROM users WHERE id = $1",
+                UUID(user_id)
+            )
+            
+            if user_data is None:
+                raise credentials_exception
+            
+            return User(
+                id=user_data["id"],
+                tenant_id=user_data["tenant_id"],
+                email=user_data["email"],
+                role=user_data["role"],
+                created_at=user_data["created_at"],
+                updated_at=user_data["updated_at"]
+            )
+            
+    except JWTError:
+        raise credentials_exception
+
 @router.post("/auth/register", response_model=TokenResponse)
 async def register(request: RegisterRequest):
     """Register new tenant and owner."""
