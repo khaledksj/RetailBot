@@ -701,7 +701,11 @@ class ChatbotApp {
                 this.showMessage('Login successful!', 'success');
             } else {
                 const error = await response.json();
-                this.showMessage(error.detail || 'Login failed', 'error');
+                if (response.status === 401) {
+                    this.showMessage('Wrong email or password. Please try again.', 'error');
+                } else {
+                    this.showMessage(error.detail || 'Login failed', 'error');
+                }
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -757,6 +761,7 @@ class ChatbotApp {
         document.getElementById('auth-tab-item').style.display = 'none';
         document.getElementById('upload-tab-item').style.display = 'block';
         document.getElementById('chat-tab-item').style.display = 'block';
+        document.getElementById('logout-tab-item').style.display = 'block';
         
         // Switch to upload tab
         const uploadTab = new bootstrap.Tab(document.getElementById('upload-tab'));
@@ -768,19 +773,22 @@ class ChatbotApp {
         this.currentUser = null;
         localStorage.removeItem('authToken');
         
-        // Show auth tab and hide main functionality
+        // Hide authenticated tabs and show auth tab
         document.getElementById('auth-tab-item').style.display = 'block';
         document.getElementById('upload-tab-item').style.display = 'none';
         document.getElementById('chat-tab-item').style.display = 'none';
-        
-        // Switch to auth tab
-        const authTab = new bootstrap.Tab(document.getElementById('auth-tab'));
-        authTab.show();
+        document.getElementById('logout-tab-item').style.display = 'none';
         
         // Clear forms
         document.getElementById('loginForm').reset();
         document.getElementById('registerForm').reset();
+        
+        // Show auth tab
+        document.getElementById('auth-tab').click();
+        
+        this.showMessage('Logged out successfully', 'info');
     }
+
 }
 
 // Global function for source preview
