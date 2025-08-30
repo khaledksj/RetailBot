@@ -284,17 +284,16 @@ class SupabaseVectorStore(VectorStore):
             
         async with self.pool.acquire() as conn:  # type: ignore
             if tenant_id:
-                await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
                 result = await conn.fetchval(
-                    "SELECT document_exists_by_hash_tenant($1, $2)",
+                    "SELECT EXISTS(SELECT 1 FROM documents WHERE content_hash = $1 AND tenant_id = $2)",
                     content_hash, str(tenant_id)
                 )
             else:
                 result = await conn.fetchval(
-                    "SELECT document_exists_by_hash($1)",
+                    "SELECT EXISTS(SELECT 1 FROM documents WHERE content_hash = $1)",
                     content_hash
                 )
-            return result
+            return bool(result)
     
     async def similarity_search(
         self,
@@ -312,15 +311,23 @@ class SupabaseVectorStore(VectorStore):
             
             # Use tenant-aware search if tenant_id provided
             if tenant_id:
-                await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
                 rows = await conn.fetch(
-                    "SELECT * FROM search_similar_chunks_tenant($1::vector, $2, $3, $4)",
-                    query_vector_str, str(tenant_id), 0.0, top_k
+                    """SELECT chunk_id, doc_id, tenant_id, filename, page, chunk_idx, content, content_tokens, created_at,
+                              1 - (embedding <=> $1::vector) as similarity_score
+                       FROM chunks 
+                       WHERE tenant_id = $2
+                       ORDER BY embedding <=> $1::vector 
+                       LIMIT $3""",
+                    query_vector_str, str(tenant_id), top_k
                 )
             else:
                 rows = await conn.fetch(
-                    "SELECT * FROM search_similar_chunks($1::vector, $2, $3)",
-                    query_vector_str, 0.0, top_k
+                    """SELECT chunk_id, doc_id, tenant_id, filename, page, chunk_idx, content, content_tokens, created_at,
+                              1 - (embedding <=> $1::vector) as similarity_score
+                       FROM chunks 
+                       ORDER BY embedding <=> $1::vector 
+                       LIMIT $2""",
+                    query_vector_str, top_k
                 )
             
             results = []
