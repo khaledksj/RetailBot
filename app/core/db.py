@@ -89,7 +89,9 @@ class InMemoryVectorStore(VectorStore):
         filename: str,
         content_hash: str,
         chunks: List[Chunk],
-        embeddings: List[List[float]]
+        embeddings: List[List[float]],
+        tenant_id: Optional[UUID] = None,
+        created_by: Optional[UUID] = None
     ) -> str:
         """Store document chunks with embeddings in memory."""
         doc_id = str(uuid4())
@@ -127,14 +129,15 @@ class InMemoryVectorStore(VectorStore):
         
         return doc_id
     
-    async def document_exists(self, content_hash: str) -> bool:
+    async def document_exists(self, content_hash: str, tenant_id: Optional[UUID] = None) -> bool:
         """Check if document already exists by content hash."""
         return content_hash in self.content_hashes
     
     async def similarity_search(
         self,
         query_embedding: List[float],
-        top_k: int = 10
+        top_k: int = 10,
+        tenant_id: Optional[UUID] = None
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks using cosine similarity."""
         if not self.embeddings:
@@ -217,7 +220,9 @@ class SupabaseVectorStore(VectorStore):
         filename: str,
         content_hash: str,
         chunks: List[Chunk],
-        embeddings: List[List[float]]
+        embeddings: List[List[float]],
+        tenant_id: Optional[UUID] = None,
+        created_by: Optional[UUID] = None
     ) -> str:
         """Store document chunks with embeddings in Supabase."""
         if not self.pool:
@@ -271,7 +276,7 @@ class SupabaseVectorStore(VectorStore):
                 
                 return str(doc_id)
     
-    async def document_exists(self, content_hash: str, tenant_id: str = None) -> bool:
+    async def document_exists(self, content_hash: str, tenant_id: Optional[UUID] = None) -> bool:
         """Check if document already exists by content hash."""
         if not self.pool:
             await self.initialize()
@@ -281,7 +286,7 @@ class SupabaseVectorStore(VectorStore):
                 await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
                 result = await conn.fetchval(
                     "SELECT document_exists_by_hash_tenant($1, $2)",
-                    content_hash, UUID(tenant_id)
+                    content_hash, str(tenant_id)
                 )
             else:
                 result = await conn.fetchval(
@@ -294,7 +299,7 @@ class SupabaseVectorStore(VectorStore):
         self,
         query_embedding: List[float],
         top_k: int = 10,
-        tenant_id: str = None
+        tenant_id: Optional[UUID] = None
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks using pgvector cosine similarity."""
         if not self.pool:
@@ -309,7 +314,7 @@ class SupabaseVectorStore(VectorStore):
                 await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
                 rows = await conn.fetch(
                     "SELECT * FROM search_similar_chunks_tenant($1::vector, $2, $3, $4)",
-                    query_vector_str, tenant_id, 0.0, top_k
+                    query_vector_str, str(tenant_id), 0.0, top_k
                 )
             else:
                 rows = await conn.fetch(
@@ -322,6 +327,7 @@ class SupabaseVectorStore(VectorStore):
                 chunk = Chunk(
                     chunk_id=row['chunk_id'],
                     doc_id=str(row['doc_id']),
+                    tenant_id=UUID(row['tenant_id']),
                     filename=row['filename'],
                     page=row['page'],
                     chunk_idx=row['chunk_idx'],
