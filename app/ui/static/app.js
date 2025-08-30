@@ -452,7 +452,6 @@ class ChatbotApp {
             // Send message
             const temperature = parseFloat(document.getElementById('temperatureSlider').value);
             const token = localStorage.getItem('authToken');
-            console.log('Sending WebSocket message with token:', token ? 'token present' : 'no token');
             this.websocket.send(JSON.stringify({
                 message: message,
                 session_id: 'default',

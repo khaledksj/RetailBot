@@ -40,7 +40,7 @@ async def chat(
             query=request.message,
             session_id=request.session_id,
             temperature=request.temperature,
-            tenant_id=current_user.tenant_id
+            tenant_id=str(current_user.tenant_id)
         )
         
         logger.info(f"Chat response generated", extra={

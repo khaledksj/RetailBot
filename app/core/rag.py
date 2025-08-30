@@ -2,7 +2,7 @@
 RAG (Retrieval-Augmented Generation) pipeline for the Shop Manual Chatbot.
 """
 
-from typing import List, Dict, Any, AsyncGenerator
+from typing import List, Dict, Any, AsyncGenerator, Optional
 import numpy as np
 from datetime import datetime
 from uuid import UUID
@@ -116,7 +116,7 @@ USER QUESTION:
         query: str,
         session_id: str = "default",
         temperature: float = 0.2,
-        tenant_id: str = None
+        tenant_id: Optional[str] = None
     ) -> ChatResponse:
         """Process a user query through the RAG pipeline."""
         start_time = datetime.utcnow()
@@ -230,7 +230,7 @@ USER QUESTION:
         query: str,
         session_id: str = "default",
         temperature: float = 0.2,
-        tenant_id: str = None
+        tenant_id: Optional[str] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat response through WebSocket."""
         try:
