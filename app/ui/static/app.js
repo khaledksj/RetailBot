@@ -300,6 +300,9 @@ class ChatbotApp {
             
             const response = await fetch('/api/ingest', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                },
                 body: formData
             });
             
