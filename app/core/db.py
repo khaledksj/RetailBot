@@ -236,10 +236,6 @@ class SupabaseVectorStore(VectorStore):
         
         async with self.pool.acquire() as conn:  # type: ignore
             async with conn.transaction():
-                # Set tenant context if provided
-                if tenant_id:
-                    await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
-                
                 # Insert document
                 doc_id = await conn.fetchval(
                     "INSERT INTO documents (filename, content_hash, chunk_count, tenant_id, created_by) VALUES ($1, $2, $3, $4::uuid, $5::uuid) RETURNING doc_id",
