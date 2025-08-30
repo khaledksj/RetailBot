@@ -29,13 +29,19 @@
     <div class="container mt-4">
         <!-- Tab Navigation -->
         <ul class="nav nav-tabs" id="mainTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
+            <li class="nav-item" role="presentation" id="auth-tab-item">
+                <button class="nav-link active" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab">
+                    <i class="fas fa-sign-in-alt me-2"></i>
+                    <span data-i18n="authentication">Login / Register</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation" id="upload-tab-item" style="display: none;">
+                <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">
                     <i class="fas fa-upload me-2"></i>
                     <span data-i18n="upload_documents">Upload Documents</span>
                 </button>
             </li>
-            <li class="nav-item" role="presentation">
+            <li class="nav-item" role="presentation" id="chat-tab-item" style="display: none;">
                 <button class="nav-link" id="chat-tab" data-bs-toggle="tab" data-bs-target="#chat" type="button" role="tab">
                     <i class="fas fa-comments me-2"></i>
                     <span data-i18n="chat">Chat</span>
@@ -45,8 +51,81 @@
 
         <!-- Tab Content -->
         <div class="tab-content mt-3" id="mainTabContent">
+            <!-- Authentication Tab -->
+            <div class="tab-pane fade show active" id="auth" role="tabpanel">
+                <div class="row justify-content-center">
+                    <div class="col-lg-6">
+                        <!-- Login Form -->
+                        <div class="card mb-4" id="loginCard">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-sign-in-alt me-2"></i>
+                                    <span data-i18n="login">Login</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="loginForm">
+                                    <div class="mb-3">
+                                        <label for="loginEmail" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="loginEmail" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="loginPassword" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="loginPassword" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-sign-in-alt me-2"></i>
+                                        <span data-i18n="login">Login</span>
+                                    </button>
+                                </form>
+                                <div class="text-center mt-3">
+                                    <button class="btn btn-link" onclick="showRegisterForm()">
+                                        <span data-i18n="no_account">Don't have an account? Register here</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Register Form -->
+                        <div class="card" id="registerCard" style="display: none;">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-user-plus me-2"></i>
+                                    <span data-i18n="register">Register</span>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="registerForm">
+                                    <div class="mb-3">
+                                        <label for="registerEmail" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="registerEmail" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="registerPassword" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="registerPassword" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="tenantName" class="form-label">Company Name</label>
+                                        <input type="text" class="form-control" id="tenantName" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="fas fa-user-plus me-2"></i>
+                                        <span data-i18n="register">Register</span>
+                                    </button>
+                                </form>
+                                <div class="text-center mt-3">
+                                    <button class="btn btn-link" onclick="showLoginForm()">
+                                        <span data-i18n="have_account">Already have an account? Login here</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Upload Tab -->
-            <div class="tab-pane fade show active" id="upload" role="tabpanel">
+            <div class="tab-pane fade" id="upload" role="tabpanel">
                 <div class="row">
                     <div class="col-lg-8 mx-auto">
                         <div class="card">

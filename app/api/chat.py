@@ -2,16 +2,20 @@
 Chat API endpoints for the Shop Manual Chatbot RAG system.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.core.logging import get_logger
-from app.core.models import ChatRequest, ChatResponse
+from app.core.models import ChatRequest, ChatResponse, User
+from app.api.auth_working import get_current_user
 from app.core.rag import RAGPipeline
 
 router = APIRouter()
 logger = get_logger(__name__)
 
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Handle chat requests using RAG pipeline.
     

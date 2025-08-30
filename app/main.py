@@ -14,7 +14,7 @@ from app.core.settings import get_settings
 from app.core.logging import setup_logging, get_logger
 from app.core.db import get_vector_store
 from app.api import ingest, chat, health, debug
-from app.api import auth_simple
+from app.api import auth_working
 from app.api.vector_viewer import router as vector_viewer_router
 
 # Initialize settings and logging
@@ -53,7 +53,7 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(auth_simple.router, prefix="/api", tags=["auth"])
+app.include_router(auth_working.router, prefix="/api", tags=["auth"])
 app.include_router(ingest.router, prefix="/api", tags=["ingest"])
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(health.router, prefix="/api", tags=["health"])

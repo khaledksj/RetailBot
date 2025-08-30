@@ -2,7 +2,7 @@
 PDF ingestion API endpoints for the Shop Manual Chatbot RAG system.
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from typing import List, Optional
 import hashlib
 import asyncio
@@ -15,6 +15,8 @@ from app.core.chunker import DocumentChunker
 from app.core.llm import EmbeddingService
 from app.core.db import get_vector_store
 from app.core.settings import get_settings
+from app.api.auth_working import get_current_user
+from app.core.models import User
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -23,7 +25,8 @@ settings = get_settings()
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest_pdfs(
     files: List[UploadFile] = File(...),
-    force: bool = Form(False)
+    force: bool = Form(False),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Ingest one or more PDF files into the vector database.
@@ -96,8 +99,8 @@ async def ingest_pdfs(
             # Calculate content hash for deduplication
             content_hash = hashlib.sha256(content).hexdigest()
             
-            # Check if document already exists
-            if not force and await vector_store.document_exists(content_hash):
+            # Check if document already exists (tenant-aware)
+            if not force and await vector_store.document_exists(content_hash, current_user.tenant_id):
                 results.append(DocumentInfo(
                     filename=filename,
                     status="skipped",
@@ -146,12 +149,14 @@ async def ingest_pdfs(
             chunk_texts = [chunk.content for chunk in all_chunks]
             embeddings = await embedding_service.create_embeddings(chunk_texts)
             
-            # Store in vector database
+            # Store in vector database (tenant-aware)
             doc_id = await vector_store.store_document(
                 filename=filename,
                 content_hash=content_hash,
                 chunks=all_chunks,
-                embeddings=embeddings
+                embeddings=embeddings,
+                tenant_id=current_user.tenant_id,
+                created_by=current_user.id
             )
             
             total_chunks += len(all_chunks)

@@ -8,6 +8,8 @@ class ChatbotApp {
         this.selectedFiles = [];
         this.isUploading = false;
         this.isChatting = false;
+        this.authToken = null;
+        this.currentUser = null;
         
         this.translations = {
             en: {
@@ -73,7 +75,9 @@ class ChatbotApp {
         this.setupEventListeners();
         this.loadUserPreferences();
         this.updateTranslations();
+        this.checkAuthStatus();
         this.setupWebSocket();
+        this.setupAuthentication();
     }
     
     setupEventListeners() {
@@ -622,12 +626,178 @@ class ChatbotApp {
             }
         }, 5000);
     }
+    
+    // Authentication methods
+    setupAuthentication() {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        
+        loginForm?.addEventListener('submit', this.handleLogin.bind(this));
+        registerForm?.addEventListener('submit', this.handleRegister.bind(this));
+    }
+
+    checkAuthStatus() {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            this.authToken = token;
+            this.getCurrentUser().then(user => {
+                if (user) {
+                    this.currentUser = user;
+                    this.showAuthenticatedView();
+                } else {
+                    this.logout();
+                }
+            });
+        }
+    }
+
+    async getCurrentUser() {
+        if (!this.authToken) return null;
+        
+        try {
+            const response = await fetch('/api/auth/me', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+            
+            if (response.ok) {
+                return await response.json();
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting current user:', error);
+            return null;
+        }
+    }
+
+    async handleLogin(e) {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.authToken = data.access_token;
+                localStorage.setItem('authToken', this.authToken);
+                
+                this.currentUser = {
+                    id: data.user_id,
+                    tenant_id: data.tenant_id,
+                    email: email,
+                    role: data.role
+                };
+                
+                this.showAuthenticatedView();
+                this.showMessage('Login successful!', 'success');
+            } else {
+                const error = await response.json();
+                this.showMessage(error.detail || 'Login failed', 'error');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            this.showMessage('Network error during login', 'error');
+        }
+    }
+
+    async handleRegister(e) {
+        e.preventDefault();
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const tenantName = document.getElementById('tenantName').value;
+        
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    email, 
+                    password, 
+                    tenant_name: tenantName 
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.authToken = data.access_token;
+                localStorage.setItem('authToken', this.authToken);
+                
+                this.currentUser = {
+                    id: data.user_id,
+                    tenant_id: data.tenant_id,
+                    email: email,
+                    role: data.role
+                };
+                
+                this.showAuthenticatedView();
+                this.showMessage('Registration successful!', 'success');
+            } else {
+                const error = await response.json();
+                this.showMessage(error.detail || 'Registration failed', 'error');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            this.showMessage('Network error during registration', 'error');
+        }
+    }
+
+    showAuthenticatedView() {
+        // Hide auth tab and show main functionality
+        document.getElementById('auth-tab-item').style.display = 'none';
+        document.getElementById('upload-tab-item').style.display = 'block';
+        document.getElementById('chat-tab-item').style.display = 'block';
+        
+        // Switch to upload tab
+        const uploadTab = new bootstrap.Tab(document.getElementById('upload-tab'));
+        uploadTab.show();
+    }
+
+    logout() {
+        this.authToken = null;
+        this.currentUser = null;
+        localStorage.removeItem('authToken');
+        
+        // Show auth tab and hide main functionality
+        document.getElementById('auth-tab-item').style.display = 'block';
+        document.getElementById('upload-tab-item').style.display = 'none';
+        document.getElementById('chat-tab-item').style.display = 'none';
+        
+        // Switch to auth tab
+        const authTab = new bootstrap.Tab(document.getElementById('auth-tab'));
+        authTab.show();
+        
+        // Clear forms
+        document.getElementById('loginForm').reset();
+        document.getElementById('registerForm').reset();
+    }
 }
 
 // Global function for source preview
 function showSourcePreview(filename, page, snippet) {
     // Simple preview - could be enhanced with a modal showing more context
     alert(`Source: ${filename} (Page ${page})\n\n${snippet}`);
+}
+
+// Global functions for form switching
+function showRegisterForm() {
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('registerCard').style.display = 'block';
+}
+
+function showLoginForm() {
+    document.getElementById('registerCard').style.display = 'none';
+    document.getElementById('loginCard').style.display = 'block';
 }
 
 // Initialize the application when the DOM is loaded

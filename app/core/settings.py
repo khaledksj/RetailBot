@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Vector Database Configuration
     vector_backend: str = "memory"  # memory, supabase, pgvector, chroma
     supabase_url: Optional[str] = os.getenv("DATABASE_URL")
+    database_url: str = os.getenv("DATABASE_URL", "")
     db_url: Optional[str] = None
     
     # Chunking Configuration
