@@ -90,8 +90,11 @@ async def chat_websocket(websocket: WebSocket):
                 try:
                     from app.api.auth_working import verify_token
                     user = await verify_token(token)
+                    logger.info(f"WebSocket user authenticated: {user.email} (tenant: {user.tenant_id})")
                 except Exception as e:
                     logger.warning(f"WebSocket authentication failed: {str(e)}")
+            else:
+                logger.warning("No token provided in WebSocket message")
             
             if not user:
                 await websocket.send_text(json.dumps({
