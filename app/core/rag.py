@@ -114,7 +114,8 @@ USER QUESTION:
         self,
         query: str,
         session_id: str = "default",
-        temperature: float = 0.2
+        temperature: float = 0.2,
+        tenant_id: str = None
     ) -> ChatResponse:
         """Process a user query through the RAG pipeline."""
         start_time = datetime.utcnow()
@@ -135,7 +136,7 @@ USER QUESTION:
             query_embeddings = await self.embedding_service.create_embeddings([query])
             query_embedding = query_embeddings[0]
             
-            # Retrieve similar chunks
+            # Retrieve similar chunks (tenant-aware search coming soon)
             chunks_with_scores = await self.vector_store.similarity_search(
                 query_embedding=query_embedding,
                 top_k=settings.top_k
@@ -249,7 +250,7 @@ USER QUESTION:
             query_embeddings = await self.embedding_service.create_embeddings([query])
             query_embedding = query_embeddings[0]
             
-            # Retrieve similar chunks
+            # Retrieve similar chunks (tenant-aware search coming soon)
             chunks_with_scores = await self.vector_store.similarity_search(
                 query_embedding=query_embedding,
                 top_k=settings.top_k

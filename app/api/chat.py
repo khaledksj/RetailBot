@@ -29,7 +29,9 @@ async def chat(
     logger.info(f"Chat request received", extra={
         "session_id": request.session_id,
         "message_length": len(request.message),
-        "temperature": request.temperature
+        "temperature": request.temperature,
+        "user_id": str(current_user.id),
+        "tenant_id": str(current_user.tenant_id)
     })
     
     try:
@@ -37,7 +39,8 @@ async def chat(
         response = await rag_pipeline.process_query(
             query=request.message,
             session_id=request.session_id,
-            temperature=request.temperature
+            temperature=request.temperature,
+            tenant_id=current_user.tenant_id
         )
         
         logger.info(f"Chat response generated", extra={
