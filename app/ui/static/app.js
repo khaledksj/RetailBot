@@ -451,10 +451,12 @@ class ChatbotApp {
             
             // Send message
             const temperature = parseFloat(document.getElementById('temperatureSlider').value);
+            const token = localStorage.getItem('authToken');
             this.websocket.send(JSON.stringify({
                 message: message,
                 session_id: 'default',
-                temperature: temperature
+                temperature: temperature,
+                token: token
             }));
             
         } catch (error) {

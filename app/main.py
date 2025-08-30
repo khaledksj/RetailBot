@@ -75,6 +75,7 @@ async def chat_websocket(websocket: WebSocket):
             query = message_data.get("message", "")
             session_id = message_data.get("session_id", "default")
             temperature = message_data.get("temperature", 0.2)
+            token = message_data.get("token", "")
             
             if not query.strip():
                 await websocket.send_text(json.dumps({
@@ -83,10 +84,28 @@ async def chat_websocket(websocket: WebSocket):
                 }))
                 continue
             
+            # Authenticate user via token
+            user = None
+            if token:
+                try:
+                    from app.api.auth_working import verify_token
+                    user = await verify_token(token)
+                except Exception as e:
+                    logger.warning(f"WebSocket authentication failed: {str(e)}")
+            
+            if not user:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Authentication required"
+                }))
+                continue
+            
             logger.info(f"WebSocket chat query received", extra={
                 "session_id": session_id,
                 "query_length": len(query),
-                "temperature": temperature
+                "temperature": temperature,
+                "user_id": str(user.id),
+                "tenant_id": str(user.tenant_id)
             })
             
             # Import here to avoid circular imports
@@ -94,11 +113,12 @@ async def chat_websocket(websocket: WebSocket):
             
             rag_pipeline = RAGPipeline()
             
-            # Stream response
+            # Stream response with tenant isolation
             async for chunk in rag_pipeline.stream_chat_response(
                 query=query,
                 session_id=session_id,
-                temperature=temperature
+                temperature=temperature,
+                tenant_id=str(user.tenant_id)
             ):
                 await websocket.send_text(json.dumps(chunk))
                 

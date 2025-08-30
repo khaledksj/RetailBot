@@ -5,6 +5,7 @@ RAG (Retrieval-Augmented Generation) pipeline for the Shop Manual Chatbot.
 from typing import List, Dict, Any, AsyncGenerator
 import numpy as np
 from datetime import datetime
+from uuid import UUID
 
 from app.core.settings import get_settings
 from app.core.logging import get_logger
@@ -136,10 +137,11 @@ USER QUESTION:
             query_embeddings = await self.embedding_service.create_embeddings([query])
             query_embedding = query_embeddings[0]
             
-            # Retrieve similar chunks (tenant-aware search coming soon)
+            # Retrieve similar chunks with tenant isolation
             chunks_with_scores = await self.vector_store.similarity_search(
                 query_embedding=query_embedding,
-                top_k=settings.top_k
+                top_k=settings.top_k,
+                tenant_id=UUID(tenant_id) if tenant_id else None
             )
             
             # Log similarity scores for debugging
@@ -227,7 +229,8 @@ USER QUESTION:
         self,
         query: str,
         session_id: str = "default",
-        temperature: float = 0.2
+        temperature: float = 0.2,
+        tenant_id: str = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream chat response through WebSocket."""
         try:
@@ -250,10 +253,11 @@ USER QUESTION:
             query_embeddings = await self.embedding_service.create_embeddings([query])
             query_embedding = query_embeddings[0]
             
-            # Retrieve similar chunks (tenant-aware search coming soon)
+            # Retrieve similar chunks with tenant isolation
             chunks_with_scores = await self.vector_store.similarity_search(
                 query_embedding=query_embedding,
-                top_k=settings.top_k
+                top_k=settings.top_k,
+                tenant_id=UUID(tenant_id) if tenant_id else None
             )
             
             # Log similarity scores for debugging (same as regular process_query)
