@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Dict, Any
 import numpy as np
 from datetime import datetime
-from uuid import uuid4
+from uuid import uuid4, UUID
 import json
 import asyncpg
 import os
@@ -33,13 +33,15 @@ class VectorStore(ABC):
         filename: str,
         content_hash: str,
         chunks: List[Chunk],
-        embeddings: List[List[float]]
+        embeddings: List[List[float]],
+        tenant_id: Optional[UUID] = None,
+        created_by: Optional[UUID] = None
     ) -> str:
         """Store document chunks with embeddings."""
         pass
     
     @abstractmethod
-    async def document_exists(self, content_hash: str) -> bool:
+    async def document_exists(self, content_hash: str, tenant_id: Optional[UUID] = None) -> bool:
         """Check if document already exists."""
         pass
     
@@ -47,7 +49,8 @@ class VectorStore(ABC):
     async def similarity_search(
         self,
         query_embedding: List[float],
-        top_k: int = 10
+        top_k: int = 10,
+        tenant_id: Optional[UUID] = None
     ) -> List[Tuple[Chunk, float]]:
         """Search for similar chunks."""
         pass
@@ -228,10 +231,14 @@ class SupabaseVectorStore(VectorStore):
         
         async with self.pool.acquire() as conn:  # type: ignore
             async with conn.transaction():
+                # Set tenant context if provided
+                if tenant_id:
+                    await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
+                
                 # Insert document
                 doc_id = await conn.fetchval(
-                    "INSERT INTO documents (filename, content_hash, chunk_count) VALUES ($1, $2, $3) RETURNING doc_id",
-                    filename, content_hash, len(chunks)
+                    "INSERT INTO documents (filename, content_hash, chunk_count, tenant_id, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING doc_id",
+                    filename, content_hash, len(chunks), tenant_id, created_by
                 )
                 
                 # Insert chunks with proper vector formatting
@@ -270,10 +277,17 @@ class SupabaseVectorStore(VectorStore):
             await self.initialize()
             
         async with self.pool.acquire() as conn:  # type: ignore
-            result = await conn.fetchval(
-                "SELECT document_exists_by_hash($1)",
-                content_hash
-            )
+            if tenant_id:
+                await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
+                result = await conn.fetchval(
+                    "SELECT document_exists_by_hash_tenant($1, $2)",
+                    content_hash, tenant_id
+                )
+            else:
+                result = await conn.fetchval(
+                    "SELECT document_exists_by_hash($1)",
+                    content_hash
+                )
             return result
     
     async def similarity_search(
@@ -289,10 +303,18 @@ class SupabaseVectorStore(VectorStore):
             # Convert query embedding to PostgreSQL vector format
             query_vector_str = '[' + ','.join(map(str, query_embedding)) + ']'
             
-            rows = await conn.fetch(
-                "SELECT * FROM search_similar_chunks($1::vector, $2, $3)",
-                query_vector_str, 0.0, top_k
-            )
+            # Use tenant-aware search if tenant_id provided
+            if tenant_id:
+                await conn.execute("SET LOCAL app.tenant_id = $1", str(tenant_id))
+                rows = await conn.fetch(
+                    "SELECT * FROM search_similar_chunks_tenant($1::vector, $2, $3, $4)",
+                    query_vector_str, tenant_id, 0.0, top_k
+                )
+            else:
+                rows = await conn.fetch(
+                    "SELECT * FROM search_similar_chunks($1::vector, $2, $3)",
+                    query_vector_str, 0.0, top_k
+                )
             
             results = []
             for row in rows:
