@@ -243,7 +243,7 @@ class SupabaseVectorStore(VectorStore):
                 # Insert document
                 doc_id = await conn.fetchval(
                     "INSERT INTO documents (filename, content_hash, chunk_count, tenant_id, created_by) VALUES ($1, $2, $3, $4, $5) RETURNING doc_id",
-                    filename, content_hash, len(chunks), tenant_id, created_by
+                    filename, content_hash, len(chunks), str(tenant_id), str(created_by)
                 )
                 
                 # Insert chunks with proper vector formatting
@@ -256,8 +256,8 @@ class SupabaseVectorStore(VectorStore):
                     
                     await conn.execute(
                         """INSERT INTO chunks 
-                           (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at) 
-                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9)""",
+                           (chunk_id, doc_id, filename, page, chunk_idx, content, content_tokens, embedding, created_at, tenant_id) 
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8::vector, $9, $10)""",
                         chunk.chunk_id,
                         doc_id,
                         chunk.filename,
@@ -266,7 +266,8 @@ class SupabaseVectorStore(VectorStore):
                         chunk.content,
                         chunk.content_tokens,
                         vector_str,
-                        chunk.created_at
+                        chunk.created_at,
+                        str(tenant_id)
                     )
                 
                 logger.info(f"Document stored successfully in Supabase", extra={
