@@ -1,0 +1,134 @@
+-- Enable the pgvector extension for vector operations
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Documents table to store document metadata
+CREATE TABLE documents (
+    doc_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    filename TEXT NOT NULL,
+    content_hash TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    chunk_count INTEGER DEFAULT 0
+);
+
+-- Chunks table to store text chunks with vector embeddings
+CREATE TABLE chunks (
+    chunk_id TEXT PRIMARY KEY,
+    doc_id UUID NOT NULL REFERENCES documents(doc_id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    page INTEGER NOT NULL,
+    chunk_idx INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    content_tokens INTEGER NOT NULL,
+    embedding VECTOR(1536), -- OpenAI text-embedding-3-large dimensions
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Regular indexes for performance optimization
+CREATE INDEX idx_chunks_doc_id ON chunks(doc_id);
+CREATE INDEX idx_chunks_filename ON chunks(filename);
+CREATE INDEX idx_chunks_page ON chunks(page);
+CREATE INDEX idx_chunks_created_at ON chunks(created_at);
+CREATE INDEX idx_documents_content_hash ON documents(content_hash);
+CREATE INDEX idx_documents_filename ON documents(filename);
+CREATE INDEX idx_documents_created_at ON documents(created_at);
+
+-- Vector similarity search index (HNSW for fast approximate search)
+CREATE INDEX idx_chunks_embedding ON chunks 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Function to search similar chunks using cosine similarity
+CREATE OR REPLACE FUNCTION search_similar_chunks(
+    query_embedding VECTOR(1536),
+    similarity_threshold FLOAT DEFAULT 0.0,
+    max_results INTEGER DEFAULT 10
+)
+RETURNS TABLE(
+    chunk_id TEXT,
+    doc_id UUID,
+    filename TEXT,
+    page INTEGER,
+    chunk_idx INTEGER,
+    content TEXT,
+    content_tokens INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE,
+    similarity_score FLOAT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        c.chunk_id,
+        c.doc_id,
+        c.filename,
+        c.page,
+        c.chunk_idx,
+        c.content,
+        c.content_tokens,
+        c.created_at,
+        1 - (c.embedding <=> query_embedding) AS similarity_score
+    FROM chunks c
+    WHERE (1 - (c.embedding <=> query_embedding)) >= similarity_threshold
+    ORDER BY c.embedding <=> query_embedding
+    LIMIT max_results;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to check if document exists by content hash
+CREATE OR REPLACE FUNCTION document_exists_by_hash(content_hash_param TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS(SELECT 1 FROM documents WHERE content_hash = content_hash_param);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get document and chunk counts
+CREATE OR REPLACE FUNCTION get_database_stats()
+RETURNS TABLE(
+    document_count BIGINT,
+    chunk_count BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        (SELECT COUNT(*) FROM documents) as document_count,
+        (SELECT COUNT(*) FROM chunks) as chunk_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to insert document with chunks in a transaction
+CREATE OR REPLACE FUNCTION store_document_with_chunks(
+    filename_param TEXT,
+    content_hash_param TEXT,
+    chunks_data JSONB
+)
+RETURNS UUID AS $$
+DECLARE
+    new_doc_id UUID;
+    chunk_item JSONB;
+BEGIN
+    -- Insert document
+    INSERT INTO documents (filename, content_hash, chunk_count)
+    VALUES (filename_param, content_hash_param, jsonb_array_length(chunks_data))
+    RETURNING doc_id INTO new_doc_id;
+
+    -- Insert chunks
+    FOR chunk_item IN SELECT * FROM jsonb_array_elements(chunks_data)
+    LOOP
+        INSERT INTO chunks (
+            chunk_id, doc_id, filename, page, chunk_idx, 
+            content, content_tokens, embedding
+        ) VALUES (
+            chunk_item->>'chunk_id',
+            new_doc_id,
+            chunk_item->>'filename',
+            (chunk_item->>'page')::INTEGER,
+            (chunk_item->>'chunk_idx')::INTEGER,
+            chunk_item->>'content',
+            (chunk_item->>'content_tokens')::INTEGER,
+            (chunk_item->>'embedding')::VECTOR(1536)
+        );
+    END LOOP;
+
+    RETURN new_doc_id;
+END;
+$$ LANGUAGE plpgsql;
